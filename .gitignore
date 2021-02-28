@@ -1,4 +1,5 @@
 # Dependencies
+.spago
 .psci_modules
 bower_components
 node_modules
@@ -6,3 +7,6 @@ node_modules
 # Generated files
 .psci
 output
+
+# Misc
+.envrc
