@@ -8,7 +8,7 @@ import Data.List (List)
 import Data.List as List
 import Data.String as String
 import Text.Parsing.StringParser (ParseError, Parser, fail, runParser, try)
-import Text.Parsing.StringParser.CodePoints (char, eof, regex, skipSpaces, whiteSpace)
+import Text.Parsing.StringParser.CodePoints (char, eof, regex, skipSpaces, string, whiteSpace)
 import Text.Parsing.StringParser.Combinators (choice, many)
 
 
@@ -57,7 +57,12 @@ pBlank = char '\n' *> pure BlankLine
 
 
 pText :: Parser MarkdownAST
-pText = Text <$> (skipSpaces *> regex ".+" <* ((void $ char '\n') <|> eof))
+pText = Text <$> (skipSpaces *> text <* ((void $ char '\n') <|> eof))
+  where
+    text = choice $ try <$>
+      [ (<>) <$> pure "#" <*> (string "\\#" *> regex ".+")
+      , regex ".+"
+      ]
 
 
 pBlock :: Parser MarkdownAST
