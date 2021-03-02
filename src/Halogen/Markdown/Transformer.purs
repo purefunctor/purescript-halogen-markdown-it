@@ -34,12 +34,12 @@ nextLine ∷ TransformerM (Maybe Markdown)
 nextLine = liftF $ NextLine identity
 
 
-pushElem ∷ Markdown → TransformerM Unit
-pushElem = liftF <<< flip PushStack unit
+pushStack ∷ Markdown → TransformerM Unit
+pushStack = liftF <<< flip PushStack unit
 
 
-popElem ∷ TransformerM (Maybe Markdown)
-popElem = liftF $ PopStack identity
+popStack ∷ TransformerM (Maybe Markdown)
+popStack = liftF $ PopStack identity
 
 
 data Element = Element (∀ w a. HH.HTML w a)
