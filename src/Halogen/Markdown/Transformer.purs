@@ -3,15 +3,16 @@ module Halogen.Markdown.Transformer where
 import Prelude
 
 import Control.Monad.Free (Free, liftF, runFreeM)
-import Control.Monad.Reader.Trans (ReaderT, runReaderT)
+import Control.Monad.Reader.Trans (ReaderT, ask, runReaderT)
 import Control.Monad.Rec.Class (class MonadRec)
-import Data.List (List(..))
-import Data.Maybe (Maybe)
+import Data.List (List(..), (:))
+import Data.List as List
+import Data.Maybe (Maybe(..))
+import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Ref (Ref, new)
+import Effect.Ref (Ref, modify_, new, read)
 import Halogen.HTML as HH
-import Halogen.Markdown.AST (Markdown)
-import Unsafe.Coerce (unsafeCoerce)
+import Halogen.Markdown.AST (Markdown(..), toHeader)
 
 
 data TransformerF n
@@ -80,4 +81,46 @@ runTransformerM dsl mds = do
   runMachineT (runFreeM go dsl) env
   where
     go ∷ TransformerF (TransformerM r) → MachineT m (TransformerM r)
-    go = unsafeCoerce
+    go instruction = do
+      env <- ask
+
+      liftEffect $ case instruction of
+        ToHalogen e n -> do
+          elems <- read env.elems
+
+          case e of
+            Text text ->
+              pushHalogen ( HH.p [ ] [ HH.text text ] )
+            Heading level text ->
+              pushHalogen ( (toHeader level) [ ] [ HH.text text ] )
+            BlankLine ->
+              pure unit
+
+          pure n
+          where
+            pushHalogen ∷ (∀ w a. HH.HTML w a) → Effect Unit
+            pushHalogen element =
+              modify_ ( Cons ( Element element ) ) env.elems
+
+        NextLine f -> do
+          lines <- read env.lines
+
+          case List.head lines of
+            Just e -> do
+              modify_ (List.drop 1) env.lines
+              pure (f $ Just e)
+            Nothing ->
+              pure $ f Nothing
+
+        PushStack e n ->
+          modify_ (\es -> e : es) env.stack *> pure n
+
+        PopStack f -> liftEffect do
+          stack <- read env.stack
+
+          case List.head stack of
+            Just e -> do
+              modify_ (List.drop 1) env.stack
+              pure (f $ Just e)
+            Nothing ->
+              pure $ f Nothing
