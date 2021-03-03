@@ -20,6 +20,8 @@ data TransformerF n
   | NextLine (Maybe Markdown → n)
   | PushStack Markdown n
   | PopStack (Maybe Markdown → n)
+  | PeekStack (Maybe Markdown → n)
+  | FlushResult (List Element → n)
 
 derive instance functorTransformerF ∷ Functor TransformerF
 
@@ -41,6 +43,14 @@ pushStack = liftF <<< flip PushStack unit
 
 popStack ∷ TransformerM (Maybe Markdown)
 popStack = liftF $ PopStack identity
+
+
+peekStack ∷ TransformerM (Maybe Markdown)
+peekStack = liftF $ PeekStack identity
+
+
+flushResult ∷ TransformerM (List Element)
+flushResult = liftF $ FlushResult identity
 
 
 data Element = Element (∀ w a. HH.HTML w a)
@@ -124,3 +134,11 @@ runTransformerM dsl mds = do
               pure (f $ Just e)
             Nothing ->
               pure $ f Nothing
+
+        PeekStack f -> do
+          stack <- read env.stack
+          pure $ f $ List.head stack
+
+        FlushResult f -> do
+          elems <- read env.elems
+          pure $ f elems
