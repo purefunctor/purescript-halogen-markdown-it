@@ -52,7 +52,7 @@ pBlank = char '\n' *> pure BlankLine
 
 parseMarkdown ∷ String → Either ParseError (List Markdown)
 parseMarkdown = runParser $ many $ choice $ try <$>
-  [ pText
-  , pHeader
+  [ pHeader
   , pBlank
+  , pText
   ]
