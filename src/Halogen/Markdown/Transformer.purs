@@ -3,17 +3,16 @@ module Halogen.Markdown.Transformer where
 import Prelude
 
 import Control.Monad.Free (Free, liftF, runFreeM)
-import Control.Monad.Reader.Trans (ReaderT, ask, runReaderT)
-import Control.Monad.Rec.Class (class MonadRec, untilJust)
+import Control.Monad.Reader.Trans (ReaderT, ask, lift, runReaderT)
+import Control.Monad.Rec.Class (untilJust)
+import Control.Monad.ST (ST, run)
+import Control.Monad.ST.Class (class MonadST, liftST)
+import Control.Monad.ST.Ref (STRef, modify, new, read)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.List (List(..), (:))
 import Data.List as List
 import Data.Maybe (Maybe(..))
-import Effect (Effect)
-import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Ref (Ref, modify_, new, read)
-import Effect.Unsafe (unsafePerformEffect)
 import Halogen.HTML as HH
 import Halogen.Markdown.AST (Markdown(..), toHeader)
 import Halogen.Markdown.Parser (parseMarkdown)
@@ -64,45 +63,41 @@ unElement ∷ Element → (∀ w a. HH.HTML w a)
 unElement (Element element) = element
 
 
-type MachineEnv =
-  { lines ∷ Ref (List Markdown)
-  , stack ∷ Ref (List Markdown)
-  , elems ∷ Ref (List Element)
+type MachineEnv s =
+  { lines ∷ STRef s (List Markdown)
+  , stack ∷ STRef s (List Markdown)
+  , elems ∷ STRef s (List Element)
   }
 
 
-type MachineT = ReaderT MachineEnv
+type MachineT s = ReaderT (MachineEnv s)
 
 
 runMachineT ∷
-  ∀ m r
-  . MonadEffect m
-  ⇒ MachineT m r
-  → MachineEnv
+  ∀ m s r
+  . MonadST s m
+  ⇒ MachineT s m r
+  → MachineEnv s
   → m r
 runMachineT = runReaderT
 
 
 runTransformerM ∷
-  ∀ m r
-  . MonadEffect m
-  ⇒ MonadRec m
+  ∀ m s r
+  . MonadST s m
   ⇒ TransformerM r
   → List Markdown
   → m r
-runTransformerM dsl mds = do
-  env <- liftEffect do
-    lines <- new mds
-    stack <- new Nil
-    elems <- new Nil
-    pure { lines, stack, elems }
-  runMachineT (runFreeM go dsl) env
+runTransformerM dsl mds = liftST $ do
+  lines <- new mds
+  stack <- new Nil
+  elems <- new Nil
+  runMachineT (runFreeM go dsl) { lines, stack, elems }
   where
-    go ∷ TransformerF (TransformerM r) → MachineT m (TransformerM r)
+    go :: TransformerF (TransformerM r) -> MachineT s (ST s) (TransformerM r)
     go instruction = do
       env <- ask
-
-      liftEffect $ case instruction of
+      lift $ case instruction of
         ToHalogen e n -> do
           elems <- read env.elems
 
@@ -116,29 +111,29 @@ runTransformerM dsl mds = do
 
           pure n
           where
-            pushHalogen ∷ (∀ w a. HH.HTML w a) → Effect Unit
+            pushHalogen ∷ (∀ w a. HH.HTML w a) → ST s Unit
             pushHalogen element =
-              modify_ ( Cons ( Element element ) ) env.elems
+              void $ modify ( Cons ( Element element ) ) env.elems
 
         NextLine f -> do
           lines <- read env.lines
 
           case List.head lines of
             Just e -> do
-              modify_ (List.drop 1) env.lines
+              void $ modify (List.drop 1) env.lines
               pure (f $ Just e)
             Nothing ->
               pure $ f Nothing
 
         PushStack e n ->
-          modify_ (\es -> e : es) env.stack *> pure n
+          modify (\es -> e : es) env.stack *> pure n
 
-        PopStack f -> liftEffect do
+        PopStack f -> do
           stack <- read env.stack
 
           case List.head stack of
             Just e -> do
-              modify_ (List.drop 1) env.stack
+              void $ modify (List.drop 1) env.stack
               pure (f $ Just e)
             Nothing ->
               pure $ f Nothing
@@ -152,8 +147,8 @@ runTransformerM dsl mds = do
           pure $ f elems
 
 
-mkHTML ∷ forall w a. String → Array (HH.HTML w a)
-mkHTML markdown = unsafePerformEffect $ do
+mkHTML ∷ ∀ w a. String → Array (HH.HTML w a)
+mkHTML markdown = run do
 
   case parseMarkdown markdown of
 
