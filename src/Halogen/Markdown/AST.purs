@@ -18,11 +18,26 @@ data Markdown
 derive instance eqMarkdown ∷ Eq Markdown
 
 
+instance showMd :: Show Markdown where
+  show (Text t) = "Text: " <> t
+  show (Heading h t) = "Heading: " <> show h <> " " <> t
+  show BlankLine = "BlankLine"
+
+
 data Level = H1 | H2 | H3 | H4 | H5 | H6
 
 
 derive instance eqLevel ∷ Eq Level
 derive instance ordLevel ∷ Ord Level
+
+
+instance showLevel :: Show Level where
+  show H1 = "H1"
+  show H2 = "H2"
+  show H3 = "H3"
+  show H4 = "H4"
+  show H5 = "H5"
+  show H6 = "H6"
 
 
 toLevel ∷ Int → Maybe Level
