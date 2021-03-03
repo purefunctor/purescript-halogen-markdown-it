@@ -4,15 +4,19 @@ import Prelude
 
 import Control.Monad.Free (Free, liftF, runFreeM)
 import Control.Monad.Reader.Trans (ReaderT, ask, runReaderT)
-import Control.Monad.Rec.Class (class MonadRec)
+import Control.Monad.Rec.Class (class MonadRec, Step(..), tailRecM)
+import Data.Array as Array
+import Data.Either (Either(..))
 import Data.List (List(..), (:))
 import Data.List as List
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Ref (Ref, modify_, new, read)
+import Effect.Unsafe (unsafePerformEffect)
 import Halogen.HTML as HH
 import Halogen.Markdown.AST (Markdown(..), toHeader)
+import Halogen.Markdown.Parser (parseMarkdown)
 
 
 data TransformerF n
@@ -142,3 +146,50 @@ runTransformerM dsl mds = do
         FlushResult f -> do
           elems <- read env.elems
           pure $ f elems
+
+
+mkHTML ∷ forall w a. String → Array (HH.HTML w a)
+mkHTML markdown = unsafePerformEffect $ do
+  case parseMarkdown markdown of
+    Right markdown' -> do
+      elements <- runTransformerM go markdown'
+      pure $ (\(Element e) -> e) <$> Array.fromFoldable elements
+    _ -> pure []
+  where
+    go = (tailRecM normalize unit) *> (tailRecM transform unit)
+
+    normalize _ = do
+      mLine <- nextLine
+
+      case mLine of
+
+        Just line@(Text text) -> do
+          mTop <- peekStack
+          line' <- case mTop of
+            Just (Text text') -> do
+              _ <- popStack
+              pure $ Text $ text <> "\n" <> text
+            _ ->
+              pure line
+          pushStack line'
+          pure (Loop unit)
+
+        Just line -> do
+          pushStack line
+          pure (Loop unit)
+
+        Nothing -> do
+          pure (Done unit)
+
+    transform _ = do
+      mLine <- popStack
+
+      case mLine of
+
+        Just line -> do
+          toHalogen line
+          pure (Loop unit)
+
+        Nothing -> do
+          result <- flushResult
+          pure (Done result)
