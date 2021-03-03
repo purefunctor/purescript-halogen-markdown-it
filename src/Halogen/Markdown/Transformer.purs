@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Free (Free, liftF, runFreeM)
 import Control.Monad.Reader.Trans (ReaderT, ask, runReaderT)
-import Control.Monad.Rec.Class (class MonadRec, Step(..), tailRecM)
+import Control.Monad.Rec.Class (class MonadRec, untilJust)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.List (List(..), (:))
@@ -57,7 +57,11 @@ flushResult ∷ TransformerM (List Element)
 flushResult = liftF $ FlushResult identity
 
 
-data Element = Element (∀ w a. HH.HTML w a)
+newtype Element = Element (∀ w a. HH.HTML w a)
+
+
+unElement ∷ Element → (∀ w a. HH.HTML w a)
+unElement (Element element) = element
 
 
 type MachineEnv =
@@ -150,46 +154,50 @@ runTransformerM dsl mds = do
 
 mkHTML ∷ forall w a. String → Array (HH.HTML w a)
 mkHTML markdown = unsafePerformEffect $ do
-  case parseMarkdown markdown of
-    Right markdown' -> do
-      elements <- runTransformerM go markdown'
-      pure $ (\(Element e) -> e) <$> Array.fromFoldable elements
-    _ -> pure []
-  where
-    go = (tailRecM normalize unit) *> (tailRecM transform unit)
 
-    normalize _ = do
+  case parseMarkdown markdown of
+
+    Right ast -> do
+      elements <- runTransformerM (normalize *> transform) ast
+      pure $ Array.fromFoldable $ unElement <$> elements
+
+    _ -> pure []
+
+  where
+    normalize = untilJust do
       mLine <- nextLine
 
       case mLine of
 
         Just line@(Text text) -> do
           mTop <- peekStack
+
           line' <- case mTop of
             Just (Text text') -> do
               _ <- popStack
               pure $ Text $ text <> "\n" <> text
             _ ->
               pure line
+
           pushStack line'
-          pure (Loop unit)
+          pure Nothing
 
         Just line -> do
           pushStack line
-          pure (Loop unit)
+          pure Nothing
 
         Nothing -> do
-          pure (Done unit)
+          pure $ Just unit
 
-    transform _ = do
+    transform = untilJust do
       mLine <- popStack
 
       case mLine of
 
         Just line -> do
           toHalogen line
-          pure (Loop unit)
+          pure Nothing
 
         Nothing -> do
           result <- flushResult
-          pure (Done result)
+          pure $ Just result
