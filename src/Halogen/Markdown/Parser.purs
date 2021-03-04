@@ -25,7 +25,7 @@ pText = Text <$> (skipSpaces *> text <* ((void $ char '\n') <|> eof))
     escaped ∷ String → Parser String
     escaped c = do
       _ <- string $ "\\" <> c
-      t <- regex ".+"
+      t <- regex ".*"
       pure $ c <> t
 
 
