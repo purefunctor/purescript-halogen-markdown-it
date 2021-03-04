@@ -108,6 +108,8 @@ runTransformerM dsl mds = liftST $ do
               pushHalogen ( (toHeader level) [ ] [ HH.text text ] )
             BlankLine ->
               pure unit
+            CodeBlock language text ->
+              pushHalogen ( HH.pre [ ] [ HH.code [ ] [ HH.text text ] ] )
 
           pure n
           where

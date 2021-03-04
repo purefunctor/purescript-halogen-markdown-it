@@ -12,6 +12,7 @@ import Web.Event.Event (Event)
 data Markdown
   = Text String
   | Heading Level String
+  | CodeBlock String String
   | BlankLine
 
 
@@ -21,6 +22,7 @@ derive instance eqMarkdown ∷ Eq Markdown
 instance showMd :: Show Markdown where
   show (Text t) = "Text: " <> t
   show (Heading h t) = "Heading: " <> show h <> " " <> t
+  show (CodeBlock l t) = "CodeBlock: " <> l <> " " <> t
   show BlankLine = "BlankLine"
 
 
