@@ -12,7 +12,7 @@ in
     name = "purescript-halogen-markdown";
     src = ./.;
     buildInputs = with easy-purescript-nix; [
-      purs-0_13_8
+      purs
       spago
       nodejs-15_x
       yarn
