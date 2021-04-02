@@ -2,7 +2,7 @@
 Welcome to a Spago project!
 You can edit this file as you like.
 -}
-{ name = "purescript-halogen-markdown"
+{ name = "halogen-markdown"
 , dependencies =
   [ "console"
   , "effect"
