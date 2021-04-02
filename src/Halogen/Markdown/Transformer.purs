@@ -1,200 +1,71 @@
-module Halogen.Markdown.Transformer where
+module Halogen.Markdown.Transfomer where
 
 import Prelude
 
-import Control.Monad.Free (Free, liftF, runFreeM)
-import Control.Monad.Reader.Trans (ReaderT, ask, lift, runReaderT)
-import Control.Monad.Rec.Class (untilJust)
-import Control.Monad.ST (ST, run)
-import Control.Monad.ST.Class (class MonadST, liftST)
-import Control.Monad.ST.Ref (STRef, modify, new, read)
+import Control.Monad.Rec.Class (Step(..), tailRec)
 import Data.Array as Array
-import Data.Either (Either(..))
 import Data.List (List(..), (:))
 import Data.List as List
 import Data.Maybe (Maybe(..))
+import Data.Tuple.Nested ((/\))
 import Halogen.HTML as HH
-import Halogen.Markdown.AST (Markdown(..), toHeader)
-import Halogen.Markdown.Parser (parseMarkdown)
+import Halogen.Markdown.AST (Line(..), Lines, Text(..), toHeader)
 
+{-----------------------------------------------------------------------}
 
-data TransformerF n
-  = ToHalogen Markdown n
-  | NextLine (Maybe Markdown → n)
-  | PushStack Markdown n
-  | PopStack (Maybe Markdown → n)
-  | PeekStack (Maybe Markdown → n)
-  | FlushResult (List Element → n)
+normalize :: Lines -> Lines
+normalize lines = List.reverse $ tailRec go { accum: lines, result: Nil }
+  where
+    go { accum: j : k : ls, result: r } =
+      case j /\ k of
+        TextLine j' /\ TextLine k' ->
+          let
+            l = TextLine $ j' <> Text "\n" <> k'
+          in
+           Loop { accum: l : ls, result: r }
+        _ ->
+          Loop { accum: k : ls, result: j : r }
+    go { accum: l : Nil, result: r } = Done (l : r)
+    go { accum: Nil, result: r } = Done r
 
-derive instance functorTransformerF ∷ Functor TransformerF
+{-----------------------------------------------------------------------}
 
-
-type TransformerM = Free TransformerF
-
-
-toHalogen ∷ Markdown → TransformerM Unit
-toHalogen = liftF <<< flip ToHalogen unit
-
-
-nextLine ∷ TransformerM (Maybe Markdown)
-nextLine = liftF $ NextLine identity
-
-
-pushStack ∷ Markdown → TransformerM Unit
-pushStack = liftF <<< flip PushStack unit
-
-
-popStack ∷ TransformerM (Maybe Markdown)
-popStack = liftF $ PopStack identity
-
-
-peekStack ∷ TransformerM (Maybe Markdown)
-peekStack = liftF $ PeekStack identity
-
-
-flushResult ∷ TransformerM (List Element)
-flushResult = liftF $ FlushResult identity
-
-
-newtype Element = Element (∀ w a. HH.HTML w a)
-
-
-unElement ∷ Element → (∀ w a. HH.HTML w a)
-unElement (Element element) = element
-
-
-type MachineEnv s =
-  { lines ∷ STRef s (List Markdown)
-  , stack ∷ STRef s (List Markdown)
-  , elems ∷ STRef s (List Element)
+type TState w a =
+  { lines :: Lines
+  , elems :: List ( HH.HTML w a )
   }
 
-
-type MachineT s = ReaderT (MachineEnv s)
-
-
-runMachineT ∷
-  ∀ m s r
-  . MonadST s m
-  ⇒ MachineT s m r
-  → MachineEnv s
-  → m r
-runMachineT = runReaderT
-
-
-runTransformerM ∷
-  ∀ m s r
-  . MonadST s m
-  ⇒ TransformerM r
-  → List Markdown
-  → m r
-runTransformerM dsl mds = liftST $ do
-  lines <- new mds
-  stack <- new Nil
-  elems <- new Nil
-  runMachineT (runFreeM go dsl) { lines, stack, elems }
+toHalogen :: forall w a. Lines -> Array ( HH.HTML w a )
+toHalogen lines = tailRec go { lines, elems: Nil }
   where
-    go :: TransformerF (TransformerM r) -> MachineT s (ST s) (TransformerM r)
-    go instruction = do
-      env <- ask
-      lift $ case instruction of
-        ToHalogen e n -> do
-          elems <- read env.elems
+    go :: TState w a -> Step ( TState w a ) ( Array ( HH.HTML w a ) )
 
-          case e of
-            Text text ->
-              pushHalogen ( HH.p [ ] [ HH.text text ] )
-            Heading level text ->
-              pushHalogen ( (toHeader level) [ ] [ HH.text text ] )
-            BlankLine ->
-              pure unit
-            CodeBlock language text ->
-              pushHalogen ( HH.pre [ ] [ HH.code [ ] [ HH.text text ] ] )
+    go { lines: l : ls, elems } =
+      case l of
+        TextLine (Text text) ->
+          let
+            elem :: HH.HTML w a
+            elem = HH.p [ ] [ HH.text text ]
+          in
+            Loop { lines: ls, elems: elem : elems  }
 
-          pure n
-          where
-            pushHalogen ∷ (∀ w a. HH.HTML w a) → ST s Unit
-            pushHalogen element =
-              void $ modify ( Cons ( Element element ) ) env.elems
+        Heading level ( Text text ) ->
+          let
+            elem :: HH.HTML w a
+            elem = ( toHeader level ) [ ] [ HH.text text ]
+          in
+           Loop { lines: ls, elems: elem : elems }
 
-        NextLine f -> do
-          lines <- read env.lines
+        CodeBlock language (Text text) ->
+          let
+            elem :: HH.HTML w a
+            elem = HH.pre [ ] [ HH.code [ ] [ HH.text text ] ]
+          in
+            Loop { lines: ls, elems: elem : elems }
 
-          case List.head lines of
-            Just e -> do
-              void $ modify (List.drop 1) env.lines
-              pure (f $ Just e)
-            Nothing ->
-              pure $ f Nothing
+        BlankLine ->
+          Loop { lines: ls, elems }
 
-        PushStack e n ->
-          modify (\es -> e : es) env.stack *> pure n
+    go { lines: Nil, elems } = Done ( Array.fromFoldable elems )
 
-        PopStack f -> do
-          stack <- read env.stack
-
-          case List.head stack of
-            Just e -> do
-              void $ modify (List.drop 1) env.stack
-              pure (f $ Just e)
-            Nothing ->
-              pure $ f Nothing
-
-        PeekStack f -> do
-          stack <- read env.stack
-          pure $ f $ List.head stack
-
-        FlushResult f -> do
-          elems <- read env.elems
-          pure $ f elems
-
-
-mkHTML ∷ ∀ w a. String → Array (HH.HTML w a)
-mkHTML markdown = run do
-
-  case parseMarkdown markdown of
-
-    Right ast -> do
-      elements <- runTransformerM (normalize *> transform) ast
-      pure $ Array.fromFoldable $ unElement <$> elements
-
-    _ -> pure []
-
-  where
-    normalize = untilJust do
-      mLine <- nextLine
-
-      case mLine of
-
-        Just line@(Text text) -> do
-          mTop <- peekStack
-
-          line' <- case mTop of
-            Just (Text text') -> do
-              _ <- popStack
-              pure $ Text $ text <> "\n" <> text
-            _ ->
-              pure line
-
-          pushStack line'
-          pure Nothing
-
-        Just line -> do
-          pushStack line
-          pure Nothing
-
-        Nothing -> do
-          pure $ Just unit
-
-    transform = untilJust do
-      mLine <- popStack
-
-      case mLine of
-
-        Just line -> do
-          toHalogen line
-          pure Nothing
-
-        Nothing -> do
-          result <- flushResult
-          pure $ Just result
+{-----------------------------------------------------------------------}

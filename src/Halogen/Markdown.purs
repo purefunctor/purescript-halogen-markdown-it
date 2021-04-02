@@ -1,9 +1,17 @@
-module Halogen.Markdown
-  ( module Halogen.Markdown.AST
-  , module Halogen.Markdown.Parser
-  , module Halogen.Markdown.Transformer
-  ) where
+module Halogen.Markdown where
 
-import Halogen.Markdown.AST (Level(..), Markdown(..), toHeader, toLevel)
-import Halogen.Markdown.Parser (pBlank, pCodeBlock, pHeader, pText, parseMarkdown)
-import Halogen.Markdown.Transformer (Element(..), MachineEnv, MachineT, TransformerF(..), TransformerM, flushResult, mkHTML, nextLine, peekStack, popStack, pushStack, runMachineT, runTransformerM, toHalogen, unElement)
+import Prelude
+
+import Data.Either (hush)
+import Data.Maybe (Maybe)
+import Halogen.HTML as HH
+import Halogen.Markdown.Parser (lines)
+import Halogen.Markdown.Transfomer (toHalogen)
+import Text.Parsing.StringParser (runParser)
+
+{-----------------------------------------------------------------------}
+
+parseMarkdown :: forall w a. String -> Maybe ( Array ( HH.HTML w a ) )
+parseMarkdown = map toHalogen <<< hush <<< runParser lines
+
+{-----------------------------------------------------------------------}

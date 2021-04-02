@@ -3,70 +3,81 @@ module Halogen.Markdown.Parser where
 import Prelude
 
 import Control.Alternative ((<|>))
-import Data.Either (Either)
-import Data.List (List)
 import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.String as String
-import Halogen.Markdown.AST (Markdown(..), toLevel)
-import Text.Parsing.StringParser (ParseError, Parser, fail, runParser, try)
+import Halogen.Markdown.AST (Language(..), Line(..), Lines, Text(..), toLevel)
+import Text.Parsing.StringParser (Parser, fail, try)
 import Text.Parsing.StringParser.CodePoints (char, eof, regex, skipSpaces, string, whiteSpace)
-import Text.Parsing.StringParser.Combinators (choice, many, manyTill)
+import Text.Parsing.StringParser.Combinators (choice, manyTill)
 
+{-----------------------------------------------------------------------}
 
-pText ∷ Parser Markdown
-pText = Text <$> (skipSpaces *> text <* ((void $ char '\n') <|> eof))
+textLine :: Parser Line
+textLine = TextLine <$> text
   where
-    text ∷ Parser String
-    text = choice $ try <$>
+    text :: Parser Text
+    text = map Text <$> choice $ try <$>
       [ escaped "#"
       , escaped "`"
       , regex ".+"
       ]
 
-    escaped ∷ String → Parser String
+    escaped :: String -> Parser String
     escaped c = do
       _ <- string $ "\\" <> c
       t <- regex ".*"
       pure $ c <> t
 
 
-pHeader ∷ Parser Markdown
-pHeader = do
+blankLine :: Parser Line
+blankLine = pure BlankLine
+
+{-----------------------------------------------------------------------}
+
+heading :: Parser Line
+heading = do
   leading <- String.length <$> whiteSpace
 
-  when (leading > 3) (fail "Invalid heading")
+  when ( leading > 3 ) ( fail "Invalid heading" )
 
   mLevel <- toLevel <<< String.length <$> regex "#+"
   skipSpaces
-  title <- regex ".*" <* (many $ char '\n')
+  title <- regex ".*"
 
   case mLevel of
-    Just level ->
-      pure $ Heading level title
     Nothing ->
       fail "Invalid heading"
+    Just level ->
+      pure $ Heading level ( Text title )
 
+{-----------------------------------------------------------------------}
 
-pCodeBlock :: Parser Markdown
-pCodeBlock = do
+codeBlock :: Parser Line
+codeBlock = do
   _ <- string "```"
 
-  language <- regex ".+" <* char '\n'
+  language <- regex ".*" <* char '\n'
 
-  code <- manyTill (regex ".+\\n") (string "```")
+  code <- manyTill ( Text <$> regex ".*" <* char '\n' ) ( string "```" )
 
-  pure $ CodeBlock language (List.foldl (<>) "" code)
+  pure $
+    CodeBlock (Language language) (List.intercalate (Text "\n") code)
 
+{-----------------------------------------------------------------------}
 
-pBlank ∷ Parser Markdown
-pBlank = char '\n' *> pure BlankLine
-
-
-parseMarkdown ∷ String → Either ParseError (List Markdown)
-parseMarkdown = runParser $ many $ choice $ try <$>
-  [ pHeader
-  , pCodeBlock
-  , pBlank
-  , pText
+line :: Parser Line
+line = choice $ try <$>
+  [ heading
+  , codeBlock
+  , textLine
+  , blankLine
   ]
+
+lines :: Parser Lines
+lines = manyTill (line <* ending) eof
+  where
+    ending :: Parser Unit
+    ending = ( void $ char '\n' ) <|> eof
+
+{-----------------------------------------------------------------------}
