@@ -17,6 +17,9 @@ import Halogen.Markdown.Transfomer (IPropSpec)
 import Halogen.Storybook (Stories, runStorybook, proxy)
 
 
+foreign import highlightBlocks :: Effect Unit
+
+
 stories :: Stories Aff
 stories = Object.fromFoldable
   [ Tuple "Halogen Markdown" $ proxy home ]
@@ -24,7 +27,10 @@ stories = Object.fromFoldable
     home =
       H.mkComponent
         { initialState: identity
-        , eval: H.mkEval H.defaultEval
+        , eval: H.mkEval $ H.defaultEval
+          { handleAction = handleAction
+          , initialize = Just unit
+          }
         , render
         }
       where
@@ -36,6 +42,12 @@ stories = Object.fromFoldable
               HH.div_
               [ HH.text "Could not parse."
               ]
+
+    handleAction _ = H.liftEffect $ highlightBlocks
+
+
+css :: forall r a. String -> HP.IProp ( class :: String | r ) a
+css = HP.class_ <<< H.ClassName
 
 
 markdown :: String
@@ -63,8 +75,8 @@ props =
   , h5:   [ HP.style "font-size: 150%; margin-bottom: 10px;" ]
   , h6:   [ HP.style "font-size: 125%; margin-bottom: 10px;" ]
   , p:    [ HP.style "margin-bottom: 10px;" ]
-  , pre:  [ ]
-  , code: [ ]
+  , pre:  [ HP.style "background-color: initial; padding: 0;" ]
+  , code: [ HP.style "padding: 1.25rem 1.50rem;", css "language-python" ]
   }
 
 
