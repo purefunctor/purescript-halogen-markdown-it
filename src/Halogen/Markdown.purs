@@ -7,14 +7,18 @@ import Data.Either (hush)
 import Data.Maybe (Maybe)
 import Halogen.HTML as HH
 import Halogen.Markdown.Parser (lines)
-import Halogen.Markdown.Transfomer (normalize, toHalogen)
+import Halogen.Markdown.Transfomer (IPropSpec, normalize, toHalogen)
 import Text.Parsing.StringParser (runParser)
 
 {-----------------------------------------------------------------------}
 
-parseMarkdown :: forall w a. String -> Maybe ( Array ( HH.HTML w a ) )
-parseMarkdown = transform <=< hush <<< runParser lines
+parseMarkdown
+  :: forall w a
+  .  IPropSpec a
+  -> String
+  -> Maybe ( Array ( HH.HTML w a ) )
+parseMarkdown props = transform <=< hush <<< runParser lines
   where
-    transform = pure <<< Array.reverse <<< toHalogen <<< normalize
+    transform = pure <<< Array.reverse <<< toHalogen props <<< normalize
 
 {-----------------------------------------------------------------------}

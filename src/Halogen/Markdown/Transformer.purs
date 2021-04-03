@@ -3,13 +3,14 @@ module Halogen.Markdown.Transfomer where
 import Prelude
 
 import Control.Monad.Rec.Class (Step(..), tailRec)
+import DOM.HTML.Indexed (HTMLcode, HTMLp, HTMLpre, Interactive)
 import Data.Array as Array
 import Data.List (List(..), (:))
 import Data.List as List
-import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested ((/\))
 import Halogen.HTML as HH
-import Halogen.Markdown.AST (Line(..), Lines, Text(..), toHeader)
+import Halogen.Markdown.AST (Level(..), Line(..), Lines, Text(..), toHeader)
+import Web.Event.Event (Event)
 
 {-----------------------------------------------------------------------}
 
@@ -30,13 +31,27 @@ normalize lines = List.reverse $ tailRec go { accum: lines, result: Nil }
 
 {-----------------------------------------------------------------------}
 
+type HTMLh = Interactive ( onScroll :: Event )
+
+type IPropSpec a =
+  { h1   :: Array ( HH.IProp HTMLh    a )
+  , h2   :: Array ( HH.IProp HTMLh    a )
+  , h3   :: Array ( HH.IProp HTMLh    a )
+  , h4   :: Array ( HH.IProp HTMLh    a )
+  , h5   :: Array ( HH.IProp HTMLh    a )
+  , h6   :: Array ( HH.IProp HTMLh    a )
+  , p    :: Array ( HH.IProp HTMLp    a )
+  , pre  :: Array ( HH.IProp HTMLpre  a )
+  , code :: Array ( HH.IProp HTMLcode a )
+  }
+
 type TState w a =
   { lines :: Lines
   , elems :: List ( HH.HTML w a )
   }
 
-toHalogen :: forall w a. Lines -> Array ( HH.HTML w a )
-toHalogen lines = tailRec go { lines, elems: Nil }
+toHalogen :: forall w a. IPropSpec a -> Lines -> Array ( HH.HTML w a )
+toHalogen props lines = ( tailRec go { lines, elems: Nil } )
   where
     go :: TState w a -> Step ( TState w a ) ( Array ( HH.HTML w a ) )
 
@@ -45,21 +60,31 @@ toHalogen lines = tailRec go { lines, elems: Nil }
         TextLine (Text text) ->
           let
             elem :: HH.HTML w a
-            elem = HH.p [ ] [ HH.text text ]
+            elem = HH.p ( props.p ) [ HH.text text ]
           in
             Loop { lines: ls, elems: elem : elems  }
 
         Heading level ( Text text ) ->
           let
+            hProps :: Array ( HH.IProp HTMLh a )
+            hProps =
+              case level of
+                H1 -> props.h1
+                H2 -> props.h2
+                H3 -> props.h3
+                H4 -> props.h4
+                H5 -> props.h5
+                H6 -> props.h6
+
             elem :: HH.HTML w a
-            elem = ( toHeader level ) [ ] [ HH.text text ]
+            elem = ( toHeader level ) hProps [ HH.text text ]
           in
-           Loop { lines: ls, elems: elem : elems }
+            Loop { lines: ls, elems: elem : elems }
 
         CodeBlock language (Text text) ->
           let
             elem :: HH.HTML w a
-            elem = HH.pre [ ] [ HH.code [ ] [ HH.text text ] ]
+            elem = HH.pre props.pre [ HH.code props.code [ HH.text text ] ]
           in
             Loop { lines: ls, elems: elem : elems }
 
