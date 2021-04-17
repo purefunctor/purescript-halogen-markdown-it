@@ -63,6 +63,16 @@ markdown = List.intercalate "\n"
   , "# Python codeblock"
   , "print('hello, world!')"
   , "```"
+  , ""
+  , "* Fruits"
+  , "  * Tomatoes"
+  , "  * Oranges"
+  , "  * Apples"
+  , ""
+  , "* Vegetables"
+  , "  * Okra"
+  , "  * Cabbage"
+  , "  * Brocolli"
   ]
 
 

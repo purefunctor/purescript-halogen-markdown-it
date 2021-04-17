@@ -9,7 +9,7 @@ import Data.List (List(..), (:))
 import Data.List as List
 import Data.Tuple.Nested ((/\))
 import Halogen.HTML as HH
-import Halogen.Markdown.AST (Level(..), Line(..), Lines, Text(..), toHeader)
+import Halogen.Markdown.AST (Level(..), Line(..), Lines, ListItem(..), Text(..), toHeader)
 import Web.Event.Event (Event)
 
 {-----------------------------------------------------------------------}
@@ -28,6 +28,12 @@ normalize lines = List.reverse $ tailRec go { accum: lines, result: Nil }
           Loop { accum: k : ls, result: j : r }
     go { accum: l : Nil, result: r } = Done (l : r)
     go { accum: Nil, result: r } = Done r
+
+{-----------------------------------------------------------------------}
+
+makeListItem :: forall w a. ListItem -> HH.HTML w a
+makeListItem (ListItem i (Text t) n) =
+  HH.li [ ] $ [ HH.text t ] <> ( Array.reverse <<< Array.fromFoldable $ makeListItem <$> n )
 
 {-----------------------------------------------------------------------}
 
@@ -87,6 +93,13 @@ toHalogen props lines = ( tailRec go { lines, elems: Nil } )
             elem = HH.pre props.pre [ HH.code props.code [ HH.text text ] ]
           in
             Loop { lines: ls, elems: elem : elems }
+
+        ItemList li ->
+          let
+            elem :: HH.HTML w a
+            elem = HH.ul [ ] ( Array.reverse $ Array.fromFoldable ( makeListItem <$> li ) )
+          in
+            Loop { lines: ls, elems: elem :elems }
 
         BlankLine ->
           Loop { lines: ls, elems }

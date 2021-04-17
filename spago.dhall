@@ -4,14 +4,23 @@ You can edit this file as you like.
 -}
 { name = "halogen-markdown"
 , dependencies =
-  [ "console"
+  [ "arrays"
+  , "console"
+  , "control"
+  , "dom-indexed"
   , "effect"
-  , "free"
+  , "either"
   , "halogen"
+  , "lists"
+  , "maybe"
+  , "newtype"
+  , "prelude"
   , "psci-support"
-  , "refs"
   , "string-parsers"
-  , "transformers"
+  , "strings"
+  , "tailrec"
+  , "tuples"
+  , "web-events"
   ]
 , packages = ./packages.dhall
 , sources = [ "src/**/*.purs", "test/**/*.purs" ]

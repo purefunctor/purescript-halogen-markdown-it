@@ -3,13 +3,14 @@ module Halogen.Markdown.Parser where
 import Prelude
 
 import Control.Alternative ((<|>))
+import Data.List (List(..), (:))
 import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.String as String
-import Halogen.Markdown.AST (Language(..), Line(..), Lines, Text(..), toLevel)
+import Halogen.Markdown.AST (Language(..), Line(..), Lines, ListItem(..), Text(..), collapse, toLevel)
 import Text.Parsing.StringParser (Parser, fail, try)
 import Text.Parsing.StringParser.CodePoints (char, eof, regex, skipSpaces, string, whiteSpace)
-import Text.Parsing.StringParser.Combinators (choice, manyTill)
+import Text.Parsing.StringParser.Combinators (choice, many, many1, manyTill)
 
 {-----------------------------------------------------------------------}
 
@@ -66,10 +67,28 @@ codeBlock = do
 
 {-----------------------------------------------------------------------}
 
+itemList :: Parser Line
+itemList = do
+  headItem <- listItem <* many ( char '\n' )
+  tailItem <- many listItem <* many ( char '\n' )
+  pure $ ItemList ( collapse $ headItem : tailItem )
+
+
+listItem :: Parser ListItem
+listItem = do
+  indent <- String.length <$> whiteSpace
+  _ <- choice $ string <$> [ "-", "+", "*" ]
+  _ <- many1 $ string " "
+  text <- Text <$> regex ".+" <* ( ( void $ char '\n' ) <|> eof )
+  pure $ ListItem indent text Nil
+
+{-----------------------------------------------------------------------}
+
 line :: Parser Line
 line = choice $ try <$>
   [ heading
   , codeBlock
+  , itemList
   , textLine
   , blankLine
   ]
