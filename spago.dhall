@@ -1,8 +1,4 @@
-{-
-Welcome to a Spago project!
-You can edit this file as you like.
--}
-{ name = "halogen-markdown"
+{ name = "halogen-markdown-it"
 , dependencies =
   [ "arrays"
   , "console"
@@ -16,6 +12,8 @@ You can edit this file as you like.
   , "newtype"
   , "prelude"
   , "psci-support"
+  , "simple-markdown-it"
+  , "strict-html-parser"
   , "string-parsers"
   , "strings"
   , "tailrec"

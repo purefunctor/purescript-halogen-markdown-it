@@ -4,5 +4,8 @@
     "build": "spago build",
     "build:examples": "spago -x examples/examples.dhall build",
     "bundle": "spago -x examples/examples.dhall bundle-app --to dist/index.js"
+  },
+  "dependencies": {
+    "markdown-it": "^12.0.6"
   }
 }

@@ -10,3 +10,4 @@ output
 
 # Misc
 .envrc
+dist/index.js
