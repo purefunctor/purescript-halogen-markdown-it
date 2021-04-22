@@ -39,11 +39,11 @@ stories = Object.fromFoldable
       H.liftEffect $ highlightBlocks
 
       html_ <- H.liftEffect $
-        HM.viewFromMd markdown HH.article_
+        HM.viewFromMd markdown
 
       H.put $ case html_ of
         Left e -> HH.h1_ [ HH.text e ]
-        Right h -> h
+        Right h -> HH.article_ h
 
 
 css :: forall r a. String -> HP.IProp ( class :: String | r ) a
@@ -54,6 +54,13 @@ markdown :: String
 markdown = """
 # Hello, World
 This is a paragraph for example.
+
+* Group 1
+  + Item 1
+  + Item 2
+* Group 2
+  + Item 1
+  + Item 2
 """
 
 

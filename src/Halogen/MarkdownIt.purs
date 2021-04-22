@@ -7,6 +7,7 @@ import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Either (Either(..))
 import Data.List (List(..), (:))
+import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested ((/\))
 import Effect (Effect)
 import Halogen.HTML as HH
@@ -25,22 +26,21 @@ type ParentElement w a = Array (HH.HTML w a) -> HH.HTML w a
 viewFromTags
   :: forall w a
    . Tags
-  -> ParentElement w a
-  -> Either String (HH.HTML w a)
-viewFromTags tags root = tailRec go { tags, contexts: (root /\ Nil) : Nil }
+  -> Either String (Array (HH.HTML w a))
+viewFromTags tags = tailRec go { tags, contexts: (Nothing /\ Nil) : Nil }
   where
     go { tags: t : ts, contexts } =
       case t of
 
         TagOpen name attributes ->
           let
-            context = (MU.element name (MU.attrs attributes) /\ Nil)
+            context = ((Just $ MU.element name (MU.attrs attributes)) /\ Nil)
           in
             Loop { tags: ts, contexts: context : contexts }
 
         TagClose _ ->
           case contexts of
-            (parent /\ pElems) : (grandparent /\ gElems) : rest ->
+            (Just parent /\ pElems) : (grandparent /\ gElems) : rest ->
               let
                 elem = parent $ Array.reverse $ Array.fromFoldable pElems
                 context = grandparent /\ elem : gElems
@@ -77,8 +77,8 @@ viewFromTags tags root = tailRec go { tags, contexts: (root /\ Nil) : Nil }
         TagDoctype ->
           Loop { tags: ts, contexts }
 
-    go { tags: Nil, contexts: (parent /\ elements) : Nil } =
-      Done $ Right $ parent $ Array.reverse $ Array.fromFoldable elements
+    go { tags: Nil, contexts: (_ /\ elements) : Nil } =
+      Done $ Right $ Array.reverse $ Array.fromFoldable elements
 
     go { tags: _, contexts: _ } = Done $ Left $ "error creating a view"
 
@@ -87,13 +87,12 @@ viewFromTags tags root = tailRec go { tags, contexts: (root /\ Nil) : Nil }
 viewFromMd
   :: forall w a
    . String
-  -> ParentElement w a
-  -> Effect (Either String (HH.HTML w a))
-viewFromMd markdown root =  do
+  -> Effect (Either String (Array (HH.HTML w a)))
+viewFromMd markdown =  do
   tags_ <- makeTags
   pure do
     tags <- tags_
-    viewFromTags tags root
+    viewFromTags tags
   where
     makeTags :: Effect (Either String Tags)
     makeTags = simplify <$> do

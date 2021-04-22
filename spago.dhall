@@ -7,6 +7,7 @@
   , "either"
   , "foldable-traversable"
   , "halogen"
+  , "maybe"
   , "lists"
   , "prelude"
   , "psci-support"
