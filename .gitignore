@@ -11,3 +11,5 @@ output
 # Misc
 .envrc
 dist/index.js
+.parcel-cache
+public

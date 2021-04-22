@@ -3,9 +3,12 @@
   "scripts": {
     "build": "spago build",
     "build:examples": "spago -x examples/examples.dhall build",
-    "bundle": "spago -x examples/examples.dhall bundle-app --to dist/index.js"
+    "bundle": "spago -x examples/examples.dhall bundle-app --to dist/index.js && parcel serve dist/index.html --dist-dir public"
   },
   "dependencies": {
     "markdown-it": "^12.0.6"
+  },
+  "devDependencies": {
+    "parcel": "^2.0.0-beta.2"
   }
 }

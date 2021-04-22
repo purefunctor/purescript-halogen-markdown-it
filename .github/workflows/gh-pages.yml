@@ -22,10 +22,10 @@ jobs:
             output
 
       - name: Build Demo
-        run: spago -x examples/examples.dhall bundle-app --to ./dist/index.js
-
+        run: yarn bundle
+        
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+          publish_dir: ./public
