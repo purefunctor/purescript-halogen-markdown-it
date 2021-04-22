@@ -33,7 +33,7 @@ stories = Object.fromFoldable
         , render
         }
       where
-        render = identity
+        render html = HH.div_ [ html ]
 
     handleAction _ = do
       H.liftEffect $ highlightBlocks
