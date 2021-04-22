@@ -10,6 +10,7 @@ import Data.List (List(..), (:))
 import Data.Tuple.Nested ((/\))
 import Effect (Effect)
 import Halogen.HTML as HH
+import Halogen.MarkdownIt.Utils as MU
 import Simple.MarkdownIt as Md
 import Text.HTML.Parser as Html
 import Text.HTML.Types (Tag(..), Tags)
@@ -30,27 +31,49 @@ viewFromTags tags root = tailRec go { tags, contexts: (root /\ Nil) : Nil }
   where
     go { tags: t : ts, contexts } =
       case t of
-        (TagOpen _ _) ->
-          Loop { tags: ts, contexts: (HH.div_ /\ Nil) : contexts }
-        (TagClose _) ->
+
+        TagOpen name attributes ->
+          let
+            context = (MU.element name (MU.attrs attributes) /\ Nil)
+          in
+            Loop { tags: ts, contexts: context : contexts }
+
+        TagClose _ ->
           case contexts of
-            (xp /\ xe) : (yp /\ ye) : zs -> do
-              let x = xp $ Array.reverse $ Array.fromFoldable $ xe
-                  y = yp /\ (x : ye)
-              Loop { tags: ts, contexts: y : zs }
-            _ -> Done $ Left $ "could not close tag"
-        (TagSingle _ _) ->
+            (parent /\ pElems) : (grandparent /\ gElems) : rest ->
+              let
+                elem = parent $ Array.reverse $ Array.fromFoldable pElems
+                context = grandparent /\ elem : gElems
+              in
+                Loop { tags: ts, contexts: context : rest }
+
+            _ ->
+              Done $ Left $ "could not pop context"
+
+        TagSingle name attributes ->
           case contexts of
-            (xp /\ xe) : zs ->
-              Loop { tags: ts, contexts: (xp /\ (HH.div_ [ ] : xe)) : zs }
+            (parent /\ pElems) : rest ->
+              let
+                elem = MU.element name (MU.attrs attributes) [ ]
+                context = parent /\ elem : pElems
+              in
+                Loop { tags: ts, contexts: context : rest }
+
             _ -> Done $ Left $ "could not pop context"
-        (TagText n) ->
+
+        TagText text ->
           case contexts of
-            (xp /\ xe) : zs ->
-              Loop { tags: ts, contexts: (xp /\ (HH.text n : xe)) : zs }
+            (parent /\ pElems) : rest ->
+              let
+                context = parent /\ HH.text text : pElems
+              in
+                Loop { tags: ts, contexts: context : rest }
+
             _ -> Done $ Left $ "could not pop context"
-        (TagComment _) ->
+
+        TagComment _ ->
           Loop { tags: ts, contexts }
+
         TagDoctype ->
           Loop { tags: ts, contexts }
 
