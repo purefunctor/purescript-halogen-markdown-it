@@ -6,7 +6,7 @@ import Data.Array as Array
 import Data.Foldable (class Foldable)
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import Text.HTML.Types (Attribute(..), Name(..), Value(..))
+import Text.HTML.Types (Attribute(..), Name(..), Value(..), Attributes)
 
 
 element
@@ -32,3 +32,12 @@ attrs
   => f Attribute
   -> Array (HP.IProp w a)
 attrs = Array.fromFoldable <<< map attr
+
+
+makeRoot
+  :: forall w a
+   . Name
+  -> Attributes
+  -> Array (HH.HTML w a)
+  -> HH.HTML w a
+makeRoot name attributes = element name (attrs attributes)
