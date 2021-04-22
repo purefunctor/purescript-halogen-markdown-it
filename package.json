@@ -3,12 +3,15 @@
   "scripts": {
     "build": "spago build",
     "build:examples": "spago -x examples/examples.dhall build",
-    "bundle": "spago -x examples/examples.dhall bundle-app --to dist/index.js && parcel serve dist/index.html --dist-dir public"
+    "bundle": "spago -x examples/examples.dhall bundle-app --to dist/index.js",
+    "dev": "yarn bundle && parcel serve dist/index.html --dist-dir public --public-url .",
+    "prod": "yarn bundle && parcel build dist/index.html --dist-dir public --public-url ."
   },
   "dependencies": {
     "markdown-it": "^12.0.6"
   },
   "devDependencies": {
+    "http-server": "^0.12.3",
     "parcel": "^2.0.0-beta.2"
   }
 }

@@ -3,7 +3,7 @@ name: GitHub Pages
 on:
   push:
     branches:
-      - develop
+      - main
 
 jobs:
   build:
@@ -22,7 +22,7 @@ jobs:
             output
 
       - name: Build Demo
-        run: yarn bundle
+        run: yarn && yarn prod
         
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
