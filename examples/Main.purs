@@ -2,7 +2,6 @@ module Main where
 
 import Prelude
 
-import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
@@ -14,6 +13,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Halogen.MarkdownIt as HM
 import Halogen.Storybook (Stories, proxy, runStorybook)
+import Type.Proxy (Proxy(..))
 
 
 foreign import highlightBlocks :: Effect Unit
@@ -25,7 +25,7 @@ stories = Object.fromFoldable
   where
     home =
       H.mkComponent
-        { initialState: \_ -> HH.div [ ] [ HH.text "Loading..." ]
+        { initialState: \_ -> unit
         , eval: H.mkEval $ H.defaultEval
           { handleAction = handleAction
           , initialize = Just unit
@@ -33,17 +33,14 @@ stories = Object.fromFoldable
         , render
         }
       where
-        render html = HH.div_ [ html ]
+        render _ = HH.div_
+          [ HH.slot ( Proxy :: _ "markdown" ) unit component { markdown } absurd
+          ]
 
-    handleAction _ = do
+        component = HM.makeComponent HH.article_
+
+    handleAction _ =
       H.liftEffect $ highlightBlocks
-
-      html_ <- H.liftEffect $
-        HM.viewFromMd markdown
-
-      H.put $ case html_ of
-        Left e -> HH.h1_ [ HH.text e ]
-        Right h -> HH.article_ h
 
 
 css :: forall r a. String -> HP.IProp ( class :: String | r ) a
@@ -61,6 +58,10 @@ This is a paragraph for example.
 * Group 2
   + Item 1
   + Item 2
+
+```py
+print('hello, world')
+```
 """
 
 
