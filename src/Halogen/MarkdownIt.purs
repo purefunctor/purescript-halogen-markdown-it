@@ -22,7 +22,6 @@ type Input =
 type State w a =
   { markdown :: String
   , body :: Maybe (Array (HH.HTML w a))
-  , rendered :: Boolean
   }
 
 
@@ -32,8 +31,7 @@ data Action
 
 
 initialState :: forall w a. Input -> State w a
-initialState { markdown } =
-  { markdown, body: Nothing, rendered: false }
+initialState { markdown } = { markdown, body: Nothing }
 
 
 render
@@ -57,7 +55,7 @@ makeComponent
 makeComponent root =
   H.mkComponent
   { initialState
-  , render: render root
+  , render: HH.memoized (\p n -> p.markdown == n.markdown) (render root)
   , eval: H.mkEval $ H.defaultEval
     { handleAction = handleAction
     , initialize = Just Initialize
